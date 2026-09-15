@@ -1,93 +1,99 @@
 <?php
 
 session_start();
-require_once "koneksi.php";
+require "koneksi.php";
 
-date_default_timezone_set('Asia/Jakarta');
+date_default_timezone_set("Asia/Jakarta");
 
-if (!isset($_SESSION['login']) || $_SESSION['role'] !== 'karyawan') {
+/* =========================
+   CEK LOGIN
+========================= */
+
+if (!isset($_SESSION['user'])) {
     header("Location: login.php");
     exit;
 }
 
-$user_id = $_SESSION['user_id'];
+$user_id = $_SESSION['user']['id'];
 
 $aksi = $_POST['aksi'] ?? '';
 
+/* =========================
+   TANGGAL & JAM JAKARTA
+========================= */
+
+$tanggal = date("Y-m-d");
+$jam     = date("H:i:s");
+
+
+/* =========================
+   DATA GPS
+========================= */
+
 $latitude  = $_POST['latitude'] ?? null;
 $longitude = $_POST['longitude'] ?? null;
+$jarak     = $_POST['jarak'] ?? null;
+
+
+/* =========================
+   FOLDER FOTO
+========================= */
 
 $folder = "uploads/selfie/";
 
-
-// Buat folder jika belum ada
 if (!is_dir($folder)) {
     mkdir($folder, 0777, true);
 }
 
 
-// =====================================================
-// ABSEN MASUK
-// =====================================================
+/* =========================
+   ABSEN MASUK
+========================= */
 
-if ($aksi === 'masuk') {
+if ($aksi === "masuk") {
 
-    // Cek apakah foto ada
-    if (!isset($_FILES['selfie']) || $_FILES['selfie']['error'] !== UPLOAD_ERR_OK) {
-        die("Foto selfie masuk wajib diupload.");
-    }
+    /* Cek apakah hari ini sudah absen */
 
-    $tanggal = date('Y-m-d');
-    $jam = date('H:i:s');
-
-
-    // Cek absensi hari ini
-    $stmt = $pdo->prepare("
-        SELECT *
+    $cek = $pdo->prepare("
+        SELECT id
         FROM absensi
         WHERE user_id = ?
         AND tanggal = ?
         LIMIT 1
     ");
 
-    $stmt->execute([
+    $cek->execute([
         $user_id,
         $tanggal
     ]);
 
-    $absensi = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($cek->fetch()) {
 
-
-    // Kalau sudah absen masuk
-    if ($absensi && !empty($absensi['jam_masuk'])) {
-        die("Anda sudah melakukan absen masuk hari ini.");
+        header("Location: absensi.php?pesan=sudah_masuk");
+        exit;
     }
 
 
-    // Validasi file
-    $file = $_FILES['selfie'];
+    /* Cek foto */
 
-    $allowed = [
-        'image/jpeg',
-        'image/png',
-        'image/webp'
-    ];
+    if (
+        !isset($_FILES['selfie']) ||
+        $_FILES['selfie']['error'] !== UPLOAD_ERR_OK
+    ) {
 
-    if (!in_array($file['type'], $allowed)) {
-        die("Format foto harus JPG, PNG, atau WEBP.");
+        header("Location: absensi.php?pesan=foto_gagal");
+        exit;
     }
 
 
-    // Maksimal 5 MB
-    if ($file['size'] > 5 * 1024 * 1024) {
-        die("Ukuran foto maksimal 5 MB.");
-    }
+    /* Nama file otomatis */
 
-
-    // Nama file unik
-    $namaFile = "masuk_" .
-        $user_id . "_" .
-        date('YmdHis') . "_" .
+    $namaFile =
+        "masuk_" .
+        $user_id .
+        "_" .
+        date("YmdHis") .
+        "_" .
         uniqid() .
         ".jpg";
 
@@ -95,82 +101,62 @@ if ($aksi === 'masuk') {
     $tujuan = $folder . $namaFile;
 
 
-    // Pindahkan foto
-    if (!move_uploaded_file($file['tmp_name'], $tujuan)) {
-        die("Gagal menyimpan foto selfie.");
+    /* Simpan foto */
+
+    if (!move_uploaded_file(
+        $_FILES['selfie']['tmp_name'],
+        $tujuan
+    )) {
+
+        header("Location: absensi.php?pesan=upload_gagal");
+        exit;
     }
 
 
-    // Jika data absensi belum ada
-    if (!$absensi) {
+    /* =========================
+       SIMPAN KE DATABASE
+    ========================= */
 
-        $stmt = $pdo->prepare("
-            INSERT INTO absensi
-            (
-                user_id,
-                tanggal,
-                jam_masuk,
-                latitude,
-                longitude,
-                selfie_masuk
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-        ");
+    $stmt = $pdo->prepare("
+        INSERT INTO absensi
+        (
+            user_id,
+            tanggal,
+            jam_masuk,
+            latitude,
+            longitude,
+            jarak,
+            selfie_masuk
+        )
+        VALUES
+        (?, ?, ?, ?, ?, ?, ?)
+    ");
 
-        $stmt->execute([
-            $user_id,
-            $tanggal,
-            $jam,
-            $latitude,
-            $longitude,
-            $namaFile
-        ]);
-
-    } else {
-
-        // Jika sudah ada data tapi belum absen masuk
-        $stmt = $pdo->prepare("
-            UPDATE absensi
-            SET
-                jam_masuk = ?,
-                latitude = ?,
-                longitude = ?,
-                selfie_masuk = ?
-            WHERE id = ?
-        ");
-
-        $stmt->execute([
-            $jam,
-            $latitude,
-            $longitude,
-            $namaFile,
-            $absensi['id']
-        ]);
-    }
+    $stmt->execute([
+        $user_id,
+        $tanggal,
+        $jam,
+        $latitude,
+        $longitude,
+        $jarak,
+        $namaFile
+    ]);
 
 
-    header("Location: dashboard.php?status=absen_masuk");
+    header("Location: absensi.php?pesan=masuk_berhasil");
     exit;
 }
 
 
-// =====================================================
-// ABSEN PULANG
-// =====================================================
+/* =========================
+   ABSEN PULANG
+========================= */
 
-if ($aksi === 'pulang') {
+if ($aksi === "pulang") {
 
-    // Cek foto
-    if (!isset($_FILES['selfie']) || $_FILES['selfie']['error'] !== UPLOAD_ERR_OK) {
-        die("Foto selfie pulang wajib diupload.");
-    }
+    /* Cari absensi hari ini */
 
-    $tanggal = date('Y-m-d');
-    $jam = date('H:i:s');
-
-
-    // Cari absensi hari ini
-    $stmt = $pdo->prepare("
+    $cek = $pdo->prepare("
         SELECT *
         FROM absensi
         WHERE user_id = ?
@@ -178,52 +164,52 @@ if ($aksi === 'pulang') {
         LIMIT 1
     ");
 
-    $stmt->execute([
+    $cek->execute([
         $user_id,
         $tanggal
     ]);
 
-    $absensi = $stmt->fetch(PDO::FETCH_ASSOC);
+    $absensi = $cek->fetch(PDO::FETCH_ASSOC);
 
+
+    /* Belum absen masuk */
 
     if (!$absensi) {
-        die("Anda belum melakukan absen masuk.");
+
+        header("Location: absensi.php?pesan=belum_masuk");
+        exit;
     }
 
 
-    if (empty($absensi['jam_masuk'])) {
-        die("Anda belum melakukan absen masuk.");
-    }
-
+    /* Sudah absen pulang */
 
     if (!empty($absensi['jam_keluar'])) {
-        die("Anda sudah melakukan absen pulang hari ini.");
+
+        header("Location: absensi.php?pesan=sudah_pulang");
+        exit;
     }
 
 
-    // Validasi file
-    $file = $_FILES['selfie'];
+    /* Cek foto */
 
-    $allowed = [
-        'image/jpeg',
-        'image/png',
-        'image/webp'
-    ];
+    if (
+        !isset($_FILES['selfie']) ||
+        $_FILES['selfie']['error'] !== UPLOAD_ERR_OK
+    ) {
 
-    if (!in_array($file['type'], $allowed)) {
-        die("Format foto harus JPG, PNG, atau WEBP.");
+        header("Location: absensi.php?pesan=foto_gagal");
+        exit;
     }
 
 
-    if ($file['size'] > 5 * 1024 * 1024) {
-        die("Ukuran foto maksimal 5 MB.");
-    }
+    /* Nama file */
 
-
-    // Nama file
-    $namaFile = "pulang_" .
-        $user_id . "_" .
-        date('YmdHis') . "_" .
+    $namaFile =
+        "pulang_" .
+        $user_id .
+        "_" .
+        date("YmdHis") .
+        "_" .
         uniqid() .
         ".jpg";
 
@@ -231,17 +217,29 @@ if ($aksi === 'pulang') {
     $tujuan = $folder . $namaFile;
 
 
-    if (!move_uploaded_file($file['tmp_name'], $tujuan)) {
-        die("Gagal menyimpan foto selfie.");
+    /* Simpan foto */
+
+    if (!move_uploaded_file(
+        $_FILES['selfie']['tmp_name'],
+        $tujuan
+    )) {
+
+        header("Location: absensi.php?pesan=upload_gagal");
+        exit;
     }
 
 
-    // Update absensi
+    /* =========================
+       UPDATE DATABASE
+    ========================= */
+
     $stmt = $pdo->prepare("
         UPDATE absensi
+
         SET
             jam_keluar = ?,
             selfie_pulang = ?
+
         WHERE id = ?
     ");
 
@@ -252,11 +250,16 @@ if ($aksi === 'pulang') {
     ]);
 
 
-    header("Location: dashboard.php?status=absen_pulang");
+    header("Location: absensi.php?pesan=pulang_berhasil");
     exit;
 }
 
 
-die("Aksi absensi tidak ditemukan.");
+/* =========================
+   AKSI TIDAK VALID
+========================= */
+
+header("Location: absensi.php?pesan=aksi_tidak_valid");
+exit;
 
 ?>
