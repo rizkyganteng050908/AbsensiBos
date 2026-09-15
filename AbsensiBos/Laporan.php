@@ -1,44 +1,34 @@
 <?php
-
 session_start();
-require_once "koneksi.php";
+require "koneksi.php";
 
-if (!isset($_SESSION['login']) || $_SESSION['role'] !== 'admin') {
+if (
+    !isset($_SESSION['user']) ||
+    $_SESSION['user']['role'] !== 'admin'
+) {
     header("Location: login.php");
     exit;
 }
 
-
-$stmt = $pdo->query("
+$sql = "
     SELECT
-        absensi.id,
-        absensi.tanggal,
-        absensi.jam_masuk,
-        absensi.jam_keluar,
-        absensi.selfie_masuk,
-        absensi.selfie_pulang,
+        absensi.*,
         users.nip,
         users.nama,
         users.jabatan
     FROM absensi
-    INNER JOIN users
-        ON users.id = absensi.user_id
-    ORDER BY
-        absensi.tanggal DESC,
-        absensi.id DESC
-");
+    INNER JOIN users ON absensi.user_id = users.id
+    ORDER BY absensi.tanggal DESC, absensi.id DESC
+";
 
+$stmt = $pdo->query($sql);
 $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
 ?>
 
 <!DOCTYPE html>
 <html lang="id">
-
 <head>
-
 <meta charset="UTF-8">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Laporan Absensi</title>
@@ -47,128 +37,89 @@ $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 * {
     box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
 }
 
 body {
-    margin: 0;
-    font-family: Arial, sans-serif;
     background: #f1f5f9;
-    color: #1e293b;
-}
-
-.sidebar {
-    position: fixed;
-    width: 240px;
-    height: 100vh;
-    background: #1e293b;
-    padding: 25px 15px;
-    color: white;
-}
-
-.logo {
-    text-align: center;
-    font-size: 20px;
-    font-weight: bold;
-    margin-bottom: 30px;
-}
-
-.menu a {
-    display: block;
-    padding: 13px;
-    color: #cbd5e1;
-    text-decoration: none;
-    border-radius: 8px;
-    margin-bottom: 8px;
-}
-
-.menu a:hover,
-.menu a.active {
-    background: #2563eb;
-    color: white;
-}
-
-.content {
-    margin-left: 240px;
     padding: 30px;
 }
 
-.card {
+.container {
+    max-width: 1400px;
+    margin: auto;
+}
+
+.header {
     background: white;
     padding: 25px;
     border-radius: 15px;
+    margin-bottom: 20px;
     box-shadow: 0 5px 20px rgba(0,0,0,.06);
 }
 
-h1 {
-    margin-top: 0;
+.header h1 {
+    color: #1e293b;
+    margin-bottom: 8px;
 }
 
-.table-wrapper {
+.header p {
+    color: #64748b;
+}
+
+.table-box {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,.06);
     overflow-x: auto;
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
-}
-
-th,
-td {
-    padding: 13px;
-    border-bottom: 1px solid #e2e8f0;
-    text-align: left;
-    white-space: nowrap;
 }
 
 th {
+    background: #2563eb;
+    color: white;
+    padding: 14px;
+    text-align: center;
+}
+
+td {
+    padding: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: center;
+    vertical-align: middle;
+}
+
+tr:hover {
     background: #f8fafc;
 }
 
 .foto {
-    width: 75px;
-    height: 75px;
+    width: 90px;
+    height: 70px;
     object-fit: cover;
     border-radius: 10px;
-    cursor: pointer;
     border: 2px solid #e2e8f0;
+    cursor: pointer;
 }
 
-.no-foto {
+.foto:hover {
+    transform: scale(1.05);
+}
+
+.tidak-ada {
     color: #94a3b8;
 }
 
-.badge {
-    display: inline-block;
-    padding: 5px 9px;
-    border-radius: 20px;
-    font-size: 12px;
+.jam {
     font-weight: bold;
-}
-
-.masuk {
-    background: #dcfce7;
-    color: #166534;
-}
-
-.pulang {
-    background: #fef3c7;
-    color: #92400e;
-}
-
-@media(max-width:768px) {
-
-    .sidebar {
-        position: relative;
-        width: 100%;
-        height: auto;
-    }
-
-    .content {
-        margin-left: 0;
-        padding: 20px;
-    }
-
+    color: #1e293b;
 }
 
 </style>
@@ -177,235 +128,180 @@ th {
 
 <body>
 
+<div class="container">
 
-<div class="sidebar">
+    <div class="header">
 
-<div class="logo">
-    📊 Smart Attendance
-</div>
+        <h1>📊 Laporan Absensi Karyawan</h1>
 
-<div class="menu">
+        <p>
+            Data absensi masuk dan pulang karyawan.
+        </p>
 
-<a href="dashboard.php">
-    🏠 Dashboard
-</a>
+    </div>
 
-<a href="karyawan.php">
-    👨‍💼 Data Karyawan
-</a>
 
-<a href="approval.php">
-    📋 Approval
-</a>
+    <div class="table-box">
 
-<a href="laporan.php" class="active">
-    📊 Laporan Absensi
-</a>
+        <table>
 
-<a href="logout.php">
-    🚪 Logout
-</a>
+            <thead>
 
-</div>
+                <tr>
 
-</div>
+                    <th>No</th>
 
+                    <th>Tanggal</th>
 
-<div class="content">
+                    <th>NIP</th>
 
-<div class="card">
+                    <th>Nama</th>
 
-<h1>📊 Laporan Absensi</h1>
+                    <th>Jabatan</th>
 
-<p>
-Foto selfie karyawan saat melakukan absensi masuk dan pulang.
-</p>
+                    <th>Jam Masuk</th>
 
+                    <th>Foto Masuk</th>
 
-<div class="table-wrapper">
+                    <th>Jam Pulang</th>
 
-<table>
+                    <th>Foto Pulang</th>
 
-<thead>
+                </tr>
 
-<tr>
+            </thead>
 
-<th>No</th>
 
-<th>Tanggal</th>
+            <tbody>
 
-<th>NIP</th>
+            <?php if (empty($data)): ?>
 
-<th>Nama Karyawan</th>
+                <tr>
 
-<th>Jabatan</th>
+                    <td colspan="9">
 
-<th>Jam Masuk</th>
+                        Belum ada data absensi.
 
-<th>Foto Masuk</th>
+                    </td>
 
-<th>Jam Pulang</th>
+                </tr>
 
-<th>Foto Pulang</th>
+            <?php else: ?>
 
-</tr>
+                <?php $no = 1; ?>
 
-</thead>
+                <?php foreach ($data as $row): ?>
 
+                    <tr>
 
-<tbody>
+                        <td>
+                            <?= $no++ ?>
+                        </td>
 
-<?php if (count($data) > 0): ?>
+                        <td>
+                            <?= htmlspecialchars($row['tanggal']) ?>
+                        </td>
 
-<?php $no = 1; ?>
+                        <td>
+                            <?= htmlspecialchars($row['nip']) ?>
+                        </td>
 
-<?php foreach ($data as $row): ?>
+                        <td>
+                            <strong>
+                                <?= htmlspecialchars($row['nama']) ?>
+                            </strong>
+                        </td>
 
-<tr>
+                        <td>
+                            <?= htmlspecialchars($row['jabatan']) ?>
+                        </td>
 
-<td>
-<?= $no++ ?>
-</td>
+                        <td class="jam">
 
+                            <?php if (!empty($row['jam_masuk'])): ?>
 
-<td>
-<?= htmlspecialchars($row['tanggal']) ?>
-</td>
+                                <?= htmlspecialchars($row['jam_masuk']) ?>
 
+                            <?php else: ?>
 
-<td>
-<?= htmlspecialchars($row['nip']) ?>
-</td>
+                                -
 
+                            <?php endif; ?>
 
-<td>
-<?= htmlspecialchars($row['nama']) ?>
-</td>
+                        </td>
 
 
-<td>
-<?= htmlspecialchars($row['jabatan']) ?>
-</td>
+                        <td>
 
+                            <?php if (!empty($row['selfie_masuk'])): ?>
 
-<td>
+                                <img
+                                    src="uploads/selfie/<?= htmlspecialchars($row['selfie_masuk']) ?>"
+                                    class="foto"
+                                    onclick="window.open(this.src, '_blank')"
+                                    alt="Foto Masuk"
+                                >
 
-<?php if ($row['jam_masuk']): ?>
+                            <?php else: ?>
 
-<span class="badge masuk">
-<?= htmlspecialchars($row['jam_masuk']) ?>
-</span>
+                                <span class="tidak-ada">
+                                    Tidak ada
+                                </span>
 
-<?php else: ?>
+                            <?php endif; ?>
 
--
+                        </td>
 
-<?php endif; ?>
 
-</td>
+                        <td class="jam">
 
+                            <?php if (!empty($row['jam_keluar'])): ?>
 
-<td>
+                                <?= htmlspecialchars($row['jam_keluar']) ?>
 
-<?php if (!empty($row['selfie_masuk'])): ?>
+                            <?php else: ?>
 
-<img
-    src="uploads/selfie/<?= htmlspecialchars($row['selfie_masuk']) ?>"
-    class="foto"
-    onclick="lihatFoto(this.src)"
-    alt="Foto Absen Masuk"
->
+                                -
 
-<?php else: ?>
+                            <?php endif; ?>
 
-<span class="no-foto">
-Belum ada foto
-</span>
+                        </td>
 
-<?php endif; ?>
 
-</td>
+                        <td>
 
+                            <?php if (!empty($row['selfie_pulang'])): ?>
 
-<td>
+                                <img
+                                    src="uploads/selfie/<?= htmlspecialchars($row['selfie_pulang']) ?>"
+                                    class="foto"
+                                    onclick="window.open(this.src, '_blank')"
+                                    alt="Foto Pulang"
+                                >
 
-<?php if ($row['jam_keluar']): ?>
+                            <?php else: ?>
 
-<span class="badge pulang">
-<?= htmlspecialchars($row['jam_keluar']) ?>
-</span>
+                                <span class="tidak-ada">
+                                    Belum absen pulang
+                                </span>
 
-<?php else: ?>
+                            <?php endif; ?>
 
--
+                        </td>
 
-<?php endif; ?>
+                    </tr>
 
-</td>
+                <?php endforeach; ?>
 
+            <?php endif; ?>
 
-<td>
+            </tbody>
 
-<?php if (!empty($row['selfie_pulang'])): ?>
+        </table>
 
-<img
-    src="uploads/selfie/<?= htmlspecialchars($row['selfie_pulang']) ?>"
-    class="foto"
-    onclick="lihatFoto(this.src)"
-    alt="Foto Absen Pulang"
->
-
-<?php else: ?>
-
-<span class="no-foto">
-Belum ada foto
-</span>
-
-<?php endif; ?>
-
-</td>
-
-</tr>
-
-<?php endforeach; ?>
-
-<?php else: ?>
-
-<tr>
-
-<td colspan="9" style="text-align:center;">
-Belum ada data absensi.
-</td>
-
-</tr>
-
-<?php endif; ?>
-
-</tbody>
-
-</table>
+    </div>
 
 </div>
-
-</div>
-
-</div>
-
-
-<script>
-
-function lihatFoto(url) {
-
-    window.open(
-        url,
-        "_blank",
-        "width=700,height=700"
-    );
-
-}
-
-</script>
 
 </body>
-
 </html>
