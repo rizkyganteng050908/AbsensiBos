@@ -1,10 +1,8 @@
 <?php
-
 session_start();
-
 require_once "koneksi.php";
 
-// Cek admin
+// Hanya admin yang boleh akses
 if (!isset($_SESSION['login']) || $_SESSION['role'] !== 'admin') {
     header("Location: login.php");
     exit;
@@ -12,236 +10,93 @@ if (!isset($_SESSION['login']) || $_SESSION['role'] !== 'admin') {
 
 $aksi = $_POST['aksi'] ?? '';
 
-
-// ==================================================
-// TAMBAH KARYAWAN
-// ==================================================
-
+// ==============================================
+// 1. TAMBAH KARYAWAN
+// ==============================================
 if ($aksi === 'tambah') {
+    // Ambil data dari formulir
+    $nip        = trim($_POST['nip']);
+    $nama       = trim($_POST['nama']);
+    $jabatan    = trim($_POST['jabatan']);
+    $username   = trim($_POST['username']);
+    $password   = trim($_POST['password']);
+    $role       = 'karyawan';       // otomatis jadi karyawan
+    $status_aktif = 1;              // otomatis aktif
 
-    $nip      = trim($_POST['nip'] ?? '');
-    $nama     = trim($_POST['nama'] ?? '');
-    $jabatan  = trim($_POST['jabatan'] ?? '');
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
-
-    // Validasi
-    if (
-        $nip === '' ||
-        $nama === '' ||
-        $jabatan === '' ||
-        $username === '' ||
-        $password === ''
-    ) {
-        die("Semua data wajib diisi.");
-    }
-
-    if (strlen($password) < 6) {
-        die("Password minimal 6 karakter.");
-    }
-
-
-    // Cek NIP
-    $stmt = $pdo->prepare("
-        SELECT id
-        FROM users
-        WHERE nip = ?
-        LIMIT 1
-    ");
-
-    $stmt->execute([$nip]);
-
-    if ($stmt->fetch()) {
-        die("NIP sudah digunakan.");
-    }
-
-
-    // Cek username
-    $stmt = $pdo->prepare("
-        SELECT id
-        FROM users
-        WHERE username = ?
-        LIMIT 1
-    ");
-
-    $stmt->execute([$username]);
-
-    if ($stmt->fetch()) {
-        die("Username sudah digunakan.");
-    }
-
-
-    // Hash password
-    $passwordHash = password_hash(
-        $password,
-        PASSWORD_DEFAULT
-    );
-
-
-    // Insert
-    try {
-
-        $stmt = $pdo->prepare("
-            INSERT INTO users
-            (
-                nip,
-                nama,
-                jabatan,
-                username,
-                password,
-                role,
-                status_aktif
-            )
-            VALUES (?, ?, ?, ?, ?, 'karyawan', 1)
-        ");
-
-        $stmt->execute([
-            $nip,
-            $nama,
-            $jabatan,
-            $username,
-            $passwordHash
-        ]);
-
-        header("Location: karyawan.php?status=berhasil_tambah");
+    // Simpan ke database pakai PDO (sesuai gaya kode kamu)
+    $sql = "INSERT INTO users 
+            (nip, nama, jabatan, username, password, role, status_aktif, created_at)
+            VALUES 
+            (:nip, :nama, :jabatan, :username, :password, :role, :status_aktif, NOW())";
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindParam(':nip', $nip);
+    $stmt->bindParam(':nama', $nama);
+    $stmt->bindParam(':jabatan', $jabatan);
+    $stmt->bindParam(':username', $username);
+    $stmt->bindParam(':password', $password);
+    $stmt->bindParam(':role', $role);
+    $stmt->bindParam(':status_aktif', $status_aktif);
+    
+    if ($stmt->execute()) {
+        header("Location: Karyawan.php?status=berhasil_tambah");
         exit;
-
-    } catch (PDOException $e) {
-
-        die("Gagal menambahkan karyawan: " . $e->getMessage());
-
+    } else {
+        echo "<script>alert('Gagal menyimpan data!'); history.back();</script>";
     }
-
 }
 
-
-// ==================================================
-// UBAH PASSWORD
-// ==================================================
-
+// ==============================================
+// 2. UBAH PASSWORD
+// ==============================================
 if ($aksi === 'password') {
+    $id = $_POST['id'];
+    $password_baru = trim($_POST['password']);
 
-    $id       = $_POST['id'] ?? '';
-    $password = $_POST['password'] ?? '';
-
-    if ($id === '') {
-        die("ID karyawan tidak ditemukan.");
-    }
-
-    if (strlen($password) < 6) {
-        die("Password minimal 6 karakter.");
-    }
-
-
-    // Hash password baru
-    $passwordHash = password_hash(
-        $password,
-        PASSWORD_DEFAULT
-    );
-
-
-    try {
-
-        $stmt = $pdo->prepare("
-            UPDATE users
-            SET password = ?
-            WHERE id = ?
-            AND role = 'karyawan'
-        ");
-
-        $stmt->execute([
-            $passwordHash,
-            $id
-        ]);
-
-        header("Location: karyawan.php?status=berhasil_password");
+    $sql = "UPDATE users SET password = :password WHERE id = :id";
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindParam(':password', $password_baru);
+    $stmt->bindParam(':id', $id);
+    
+    if ($stmt->execute()) {
+        header("Location: Karyawan.php?status=berhasil_password");
         exit;
-
-    } catch (PDOException $e) {
-
-        die("Gagal mengubah password: " . $e->getMessage());
-
     }
-
 }
 
-
-// ==================================================
-// NONAKTIFKAN KARYAWAN
-// ==================================================
-
+// ==============================================
+// 3. NONAKTIFKAN
+// ==============================================
 if ($aksi === 'nonaktifkan') {
+    $id = $_POST['id'];
 
-    $id = $_POST['id'] ?? '';
-
-    if ($id === '') {
-        die("ID karyawan tidak ditemukan.");
-    }
-
-
-    try {
-
-        $stmt = $pdo->prepare("
-            UPDATE users
-            SET status_aktif = 0
-            WHERE id = ?
-            AND role = 'karyawan'
-        ");
-
-        $stmt->execute([$id]);
-
-        header("Location: karyawan.php?status=berhasil_nonaktif");
+    $sql = "UPDATE users SET status_aktif = 0 WHERE id = :id";
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindParam(':id', $id);
+    
+    if ($stmt->execute()) {
+        header("Location: Karyawan.php?status=berhasil_nonaktif");
         exit;
-
-    } catch (PDOException $e) {
-
-        die("Gagal menonaktifkan karyawan: " . $e->getMessage());
-
     }
-
 }
 
-
-// ==================================================
-// AKTIFKAN KARYAWAN
-// ==================================================
-
+// ==============================================
+// 4. AKTIFKAN KEMBALI
+// ==============================================
 if ($aksi === 'aktifkan') {
+    $id = $_POST['id'];
 
-    $id = $_POST['id'] ?? '';
-
-    if ($id === '') {
-        die("ID karyawan tidak ditemukan.");
-    }
-
-
-    try {
-
-        $stmt = $pdo->prepare("
-            UPDATE users
-            SET status_aktif = 1
-            WHERE id = ?
-            AND role = 'karyawan'
-        ");
-
-        $stmt->execute([$id]);
-
-        header("Location: karyawan.php?status=berhasil_aktif");
+    $sql = "UPDATE users SET status_aktif = 1 WHERE id = :id";
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindParam(':id', $id);
+    
+    if ($stmt->execute()) {
+        header("Location: Karyawan.php?status=berhasil_aktif");
         exit;
-
-    } catch (PDOException $e) {
-
-        die("Gagal mengaktifkan karyawan: " . $e->getMessage());
-
     }
-
 }
 
-
-// ==================================================
-// AKSI TIDAK DIKENAL
-// ==================================================
-
-die("Aksi tidak ditemukan.");
-
+// Kalau akses langsung tanpa aksi
+header("Location: Karyawan.php");
+exit;
 ?>
