@@ -2,7 +2,6 @@
 session_start();
 require_once "koneksi.php";
 
-// Hanya admin yang boleh akses
 if (!isset($_SESSION['login']) || $_SESSION['role'] !== 'admin') {
     header("Location: login.php");
     exit;
@@ -10,93 +9,66 @@ if (!isset($_SESSION['login']) || $_SESSION['role'] !== 'admin') {
 
 $aksi = $_POST['aksi'] ?? '';
 
-// ==============================================
-// 1. TAMBAH KARYAWAN
-// ==============================================
 if ($aksi === 'tambah') {
-    // Ambil data dari formulir
-    $nip        = trim($_POST['nip']);
-    $nama       = trim($_POST['nama']);
-    $jabatan    = trim($_POST['jabatan']);
-    $username   = trim($_POST['username']);
-    $password   = trim($_POST['password']);
-    $role       = 'karyawan';       // otomatis jadi karyawan
-    $status_aktif = 1;              // otomatis aktif
+    $nip        = $_POST['nip'] ?? '';
+    $nama       = $_POST['nama'] ?? '';
+    $jabatan    = $_POST['jabatan'] ?? '';
+    $username   = $_POST['username'] ?? '';
+    $password   = $_POST['password'] ?? '';
+    $role       = 'karyawan';
+    $status_aktif = 1;
 
-    // Simpan ke database pakai PDO (sesuai gaya kode kamu)
-    $sql = "INSERT INTO users 
-            (nip, nama, jabatan, username, password, role, status_aktif, created_at)
-            VALUES 
-            (:nip, :nama, :jabatan, :username, :password, :role, :status_aktif, NOW())";
-    
-    $stmt = $pdo->prepare($sql);
-    $stmt->bindParam(':nip', $nip);
-    $stmt->bindParam(':nama', $nama);
-    $stmt->bindParam(':jabatan', $jabatan);
-    $stmt->bindParam(':username', $username);
-    $stmt->bindParam(':password', $password);
-    $stmt->bindParam(':role', $role);
-    $stmt->bindParam(':status_aktif', $status_aktif);
-    
-    if ($stmt->execute()) {
+    if (!$nip || !$nama || !$username || !$password) {
+        echo "<script>alert('Semua kolom wajib diisi!'); history.back();</script>";
+        exit;
+    }
+
+    try {
+        $sql = "INSERT INTO users (nip, nama, jabatan, username, password, role, status_aktif, created_at)
+                VALUES (:nip, :nama, :jabatan, :username, :password, :role, :status_aktif, NOW())";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':nip'         => $nip,
+            ':nama'        => $nama,
+            ':jabatan'     => $jabatan,
+            ':username'    => $username,
+            ':password'    => $password,
+            ':role'        => $role,
+            ':status_aktif'=> $status_aktif
+        ]);
+
         header("Location: Karyawan.php?status=berhasil_tambah");
         exit;
-    } else {
-        echo "<script>alert('Gagal menyimpan data!'); history.back();</script>";
+    } catch (PDOException $e) {
+        echo "<script>alert('Error: " . addslashes($e->getMessage()) . "'); history.back();</script>";
+        exit;
     }
 }
 
-// ==============================================
-// 2. UBAH PASSWORD
-// ==============================================
 if ($aksi === 'password') {
     $id = $_POST['id'];
-    $password_baru = trim($_POST['password']);
-
-    $sql = "UPDATE users SET password = :password WHERE id = :id";
-    $stmt = $pdo->prepare($sql);
-    $stmt->bindParam(':password', $password_baru);
-    $stmt->bindParam(':id', $id);
-    
-    if ($stmt->execute()) {
-        header("Location: Karyawan.php?status=berhasil_password");
-        exit;
-    }
+    $pwd = $_POST['password'];
+    $stmt = $pdo->prepare("UPDATE users SET password=:pwd WHERE id=:id");
+    $stmt->execute([':pwd'=>$pwd, ':id'=>$id]);
+    header("Location: Karyawan.php?status=berhasil_password");
+    exit;
 }
 
-// ==============================================
-// 3. NONAKTIFKAN
-// ==============================================
 if ($aksi === 'nonaktifkan') {
-    $id = $_POST['id'];
-
-    $sql = "UPDATE users SET status_aktif = 0 WHERE id = :id";
-    $stmt = $pdo->prepare($sql);
-    $stmt->bindParam(':id', $id);
-    
-    if ($stmt->execute()) {
-        header("Location: Karyawan.php?status=berhasil_nonaktif");
-        exit;
-    }
+    $stmt = $pdo->prepare("UPDATE users SET status_aktif=0 WHERE id=:id");
+    $stmt->execute([':id'=>$_POST['id']]);
+    header("Location: Karyawan.php?status=berhasil_nonaktif");
+    exit;
 }
 
-// ==============================================
-// 4. AKTIFKAN KEMBALI
-// ==============================================
 if ($aksi === 'aktifkan') {
-    $id = $_POST['id'];
-
-    $sql = "UPDATE users SET status_aktif = 1 WHERE id = :id";
-    $stmt = $pdo->prepare($sql);
-    $stmt->bindParam(':id', $id);
-    
-    if ($stmt->execute()) {
-        header("Location: Karyawan.php?status=berhasil_aktif");
-        exit;
-    }
+    $stmt = $pdo->prepare("UPDATE users SET status_aktif=1 WHERE id=:id");
+    $stmt->execute([':id'=>$_POST['id']]);
+    header("Location: Karyawan.php?status=berhasil_aktif");
+    exit;
 }
 
-// Kalau akses langsung tanpa aksi
 header("Location: Karyawan.php");
 exit;
 ?>
